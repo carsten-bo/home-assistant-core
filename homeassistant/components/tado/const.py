@@ -46,6 +46,7 @@ TADO_HVAC_ACTION_TO_HA_HVAC_ACTION = {
 # Configuration
 CONF_FALLBACK = "fallback"
 DATA = "data"
+UPDATE_TRACK = "update_track"
 
 # Types
 TYPE_AIR_CONDITIONING = "AIR_CONDITIONING"
@@ -69,10 +70,6 @@ CONST_FAN_LOW = "LOW"
 CONST_FAN_MIDDLE = "MIDDLE"
 CONST_FAN_HIGH = "HIGH"
 
-# Services
-
-SERVICE_SET_TIMED_OFF_MODE = "set_timed_off"
-ATTR_DURATION = "duration"
 
 # When we change the temperature setting, we need an overlay mode
 CONST_OVERLAY_TADO_MODE = "TADO_MODE"  # wait until tado changes the mode automatic
@@ -139,3 +136,19 @@ SUPPORT_PRESET = [PRESET_AWAY, PRESET_HOME]
 
 TADO_SWING_OFF = "OFF"
 TADO_SWING_ON = "ON"
+
+DOMAIN = "tado"
+
+SIGNAL_TADO_UPDATE_RECEIVED = "tado_update_received_{}_{}_{}"
+UNIQUE_ID = "unique_id"
+
+DEFAULT_NAME = "Tado"
+
+TADO_BRIDGE = "Tado Bridge"
+
+UPDATE_LISTENER = "update_listener"
+
+# Services
+
+SERVICE_SET_TIMED_OFF_MODE = "set_timed_off"
+ATTR_DURATION = "duration"
