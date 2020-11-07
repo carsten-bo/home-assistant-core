@@ -6,7 +6,7 @@ import forecastio
 from requests.exceptions import ConnectionError as ConnectError, HTTPError, Timeout
 import voluptuous as vol
 
-from homeassistant.components.sensor import PLATFORM_SCHEMA
+from homeassistant.components.sensor import DEVICE_CLASS_TEMPERATURE, PLATFORM_SCHEMA
 from homeassistant.const import (
     ATTR_ATTRIBUTION,
     CONF_API_KEY,
@@ -18,13 +18,15 @@ from homeassistant.const import (
     DEGREE,
     LENGTH_CENTIMETERS,
     LENGTH_KILOMETERS,
+    LENGTH_MILLIMETERS,
+    PERCENTAGE,
+    PRESSURE_MBAR,
     SPEED_KILOMETERS_PER_HOUR,
     SPEED_METERS_PER_SECOND,
     SPEED_MILES_PER_HOUR,
     TEMP_CELSIUS,
     TEMP_FAHRENHEIT,
     TIME_HOURS,
-    UNIT_PERCENTAGE,
     UV_INDEX,
 )
 import homeassistant.helpers.config_validation as cv
@@ -109,21 +111,21 @@ SENSOR_TYPES = {
     ],
     "precip_intensity": [
         "Precip Intensity",
-        f"mm/{TIME_HOURS}",
+        f"{LENGTH_MILLIMETERS}/{TIME_HOURS}",
         "in",
-        f"mm/{TIME_HOURS}",
-        f"mm/{TIME_HOURS}",
-        f"mm/{TIME_HOURS}",
+        f"{LENGTH_MILLIMETERS}/{TIME_HOURS}",
+        f"{LENGTH_MILLIMETERS}/{TIME_HOURS}",
+        f"{LENGTH_MILLIMETERS}/{TIME_HOURS}",
         "mdi:weather-rainy",
         ["currently", "minutely", "hourly", "daily"],
     ],
     "precip_probability": [
         "Precip Probability",
-        UNIT_PERCENTAGE,
-        UNIT_PERCENTAGE,
-        UNIT_PERCENTAGE,
-        UNIT_PERCENTAGE,
-        UNIT_PERCENTAGE,
+        PERCENTAGE,
+        PERCENTAGE,
+        PERCENTAGE,
+        PERCENTAGE,
+        PERCENTAGE,
         "mdi:water-percent",
         ["currently", "minutely", "hourly", "daily"],
     ],
@@ -199,31 +201,31 @@ SENSOR_TYPES = {
     ],
     "cloud_cover": [
         "Cloud Coverage",
-        UNIT_PERCENTAGE,
-        UNIT_PERCENTAGE,
-        UNIT_PERCENTAGE,
-        UNIT_PERCENTAGE,
-        UNIT_PERCENTAGE,
+        PERCENTAGE,
+        PERCENTAGE,
+        PERCENTAGE,
+        PERCENTAGE,
+        PERCENTAGE,
         "mdi:weather-partly-cloudy",
         ["currently", "hourly", "daily"],
     ],
     "humidity": [
         "Humidity",
-        UNIT_PERCENTAGE,
-        UNIT_PERCENTAGE,
-        UNIT_PERCENTAGE,
-        UNIT_PERCENTAGE,
-        UNIT_PERCENTAGE,
+        PERCENTAGE,
+        PERCENTAGE,
+        PERCENTAGE,
+        PERCENTAGE,
+        PERCENTAGE,
         "mdi:water-percent",
         ["currently", "hourly", "daily"],
     ],
     "pressure": [
         "Pressure",
-        "mbar",
-        "mbar",
-        "mbar",
-        "mbar",
-        "mbar",
+        PRESSURE_MBAR,
+        PRESSURE_MBAR,
+        PRESSURE_MBAR,
+        PRESSURE_MBAR,
+        PRESSURE_MBAR,
         "mdi:gauge",
         ["currently", "hourly", "daily"],
     ],
@@ -329,11 +331,11 @@ SENSOR_TYPES = {
     ],
     "precip_intensity_max": [
         "Daily Max Precip Intensity",
-        f"mm/{TIME_HOURS}",
+        f"{LENGTH_MILLIMETERS}/{TIME_HOURS}",
         "in",
-        f"mm/{TIME_HOURS}",
-        f"mm/{TIME_HOURS}",
-        f"mm/{TIME_HOURS}",
+        f"{LENGTH_MILLIMETERS}/{TIME_HOURS}",
+        f"{LENGTH_MILLIMETERS}/{TIME_HOURS}",
+        f"{LENGTH_MILLIMETERS}/{TIME_HOURS}",
         "mdi:thermometer",
         ["daily"],
     ],
@@ -611,6 +613,14 @@ class DarkSkySensor(Entity):
         return SENSOR_TYPES[self.type][6]
 
     @property
+    def device_class(self):
+        """Device class of the entity."""
+        if SENSOR_TYPES[self.type][1] == TEMP_CELSIUS:
+            return DEVICE_CLASS_TEMPERATURE
+
+        return None
+
+    @property
     def device_state_attributes(self):
         """Return the state attributes."""
         return {ATTR_ATTRIBUTION: ATTRIBUTION}
@@ -790,6 +800,7 @@ class DarkSkyData:
         self.longitude = longitude
         self.units = units
         self.language = language
+        self._connect_error = False
 
         self.data = None
         self.unit_system = None
@@ -817,8 +828,13 @@ class DarkSkyData:
                 units=self.units,
                 lang=self.language,
             )
+            if self._connect_error:
+                self._connect_error = False
+                _LOGGER.info("Reconnected to Dark Sky")
         except (ConnectError, HTTPError, Timeout, ValueError) as error:
-            _LOGGER.error("Unable to connect to Dark Sky: %s", error)
+            if not self._connect_error:
+                self._connect_error = True
+                _LOGGER.error("Unable to connect to Dark Sky: %s", error)
             self.data = None
         self.unit_system = self.data and self.data.json["flags"]["units"]
 

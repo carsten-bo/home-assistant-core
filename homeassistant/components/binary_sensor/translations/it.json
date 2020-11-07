@@ -128,14 +128,14 @@
         },
         "moisture": {
             "off": "Asciutto",
-            "on": "Bagnato"
+            "on": "Umido"
         },
         "motion": {
             "off": "Assente",
             "on": "Rilevato"
         },
         "occupancy": {
-            "off": "Vuoto",
+            "off": "Assente",
             "on": "Rilevato"
         },
         "opening": {

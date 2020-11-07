@@ -4,6 +4,7 @@ from collections import OrderedDict
 import pytest
 
 from homeassistant.components.config import entity_registry
+from homeassistant.const import ATTR_ICON
 from homeassistant.helpers.entity_registry import RegistryEntry
 
 from tests.common import MockEntity, MockEntityPlatform, mock_registry
@@ -38,6 +39,7 @@ async def test_list_entities(hass, client):
         {
             "config_entry_id": None,
             "device_id": None,
+            "area_id": None,
             "disabled_by": None,
             "entity_id": "test_domain.name",
             "name": "Hello World",
@@ -47,6 +49,7 @@ async def test_list_entities(hass, client):
         {
             "config_entry_id": None,
             "device_id": None,
+            "area_id": None,
             "disabled_by": None,
             "entity_id": "test_domain.no_name",
             "name": None,
@@ -83,6 +86,7 @@ async def test_get_entity(hass, client):
     assert msg["result"] == {
         "config_entry_id": None,
         "device_id": None,
+        "area_id": None,
         "disabled_by": None,
         "platform": "test_platform",
         "entity_id": "test_domain.name",
@@ -106,6 +110,7 @@ async def test_get_entity(hass, client):
     assert msg["result"] == {
         "config_entry_id": None,
         "device_id": None,
+        "area_id": None,
         "disabled_by": None,
         "platform": "test_platform",
         "entity_id": "test_domain.no_name",
@@ -140,9 +145,9 @@ async def test_update_entity(hass, client):
     state = hass.states.get("test_domain.world")
     assert state is not None
     assert state.name == "before update"
-    assert state.attributes["icon"] == "icon:before update"
+    assert state.attributes[ATTR_ICON] == "icon:before update"
 
-    # UPDATE NAME & ICON
+    # UPDATE NAME & ICON & AREA
     await client.send_json(
         {
             "id": 6,
@@ -150,6 +155,7 @@ async def test_update_entity(hass, client):
             "entity_id": "test_domain.world",
             "name": "after update",
             "icon": "icon:after update",
+            "area_id": "mock-area-id",
         }
     )
 
@@ -158,6 +164,7 @@ async def test_update_entity(hass, client):
     assert msg["result"] == {
         "config_entry_id": None,
         "device_id": None,
+        "area_id": "mock-area-id",
         "disabled_by": None,
         "platform": "test_platform",
         "entity_id": "test_domain.world",
@@ -171,7 +178,7 @@ async def test_update_entity(hass, client):
 
     state = hass.states.get("test_domain.world")
     assert state.name == "after update"
-    assert state.attributes["icon"] == "icon:after update"
+    assert state.attributes[ATTR_ICON] == "icon:after update"
 
     # UPDATE DISABLED_BY TO USER
     await client.send_json(
@@ -203,6 +210,7 @@ async def test_update_entity(hass, client):
     assert msg["result"] == {
         "config_entry_id": None,
         "device_id": None,
+        "area_id": "mock-area-id",
         "disabled_by": None,
         "platform": "test_platform",
         "entity_id": "test_domain.world",
@@ -251,6 +259,7 @@ async def test_update_entity_no_changes(hass, client):
     assert msg["result"] == {
         "config_entry_id": None,
         "device_id": None,
+        "area_id": None,
         "disabled_by": None,
         "platform": "test_platform",
         "entity_id": "test_domain.world",
@@ -328,6 +337,7 @@ async def test_update_entity_id(hass, client):
     assert msg["result"] == {
         "config_entry_id": None,
         "device_id": None,
+        "area_id": None,
         "disabled_by": None,
         "platform": "test_platform",
         "entity_id": "test_domain.planet",

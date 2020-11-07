@@ -4,9 +4,7 @@ from datetime import timedelta
 
 from pyflunearyou import Client
 from pyflunearyou.errors import FluNearYouError
-import voluptuous as vol
 
-from homeassistant.config_entries import SOURCE_IMPORT
 from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE
 from homeassistant.core import callback
 from homeassistant.helpers import aiohttp_client, config_validation as cv
@@ -27,17 +25,7 @@ DATA_LISTENER = "listener"
 
 DEFAULT_SCAN_INTERVAL = timedelta(minutes=30)
 
-CONFIG_SCHEMA = vol.Schema(
-    {
-        vol.Optional(DOMAIN): vol.Schema(
-            {
-                vol.Optional(CONF_LATITUDE): cv.latitude,
-                vol.Optional(CONF_LONGITUDE): cv.longitude,
-            }
-        )
-    },
-    extra=vol.ALLOW_EXTRA,
-)
+CONFIG_SCHEMA = cv.deprecated(DOMAIN, invalidation_version="0.119")
 
 
 @callback
@@ -52,30 +40,13 @@ def async_get_api_category(sensor_type):
                 if sensor[0] == sensor_type
             )
         )
-    except StopIteration:
-        raise ValueError(f"Can't find category sensor type: {sensor_type}")
+    except StopIteration as err:
+        raise ValueError(f"Can't find category sensor type: {sensor_type}") from err
 
 
 async def async_setup(hass, config):
     """Set up the Flu Near You component."""
     hass.data[DOMAIN] = {DATA_CLIENT: {}, DATA_LISTENER: {}}
-
-    if DOMAIN not in config:
-        return True
-
-    hass.async_create_task(
-        hass.config_entries.flow.async_init(
-            DOMAIN,
-            context={"source": SOURCE_IMPORT},
-            data={
-                CONF_LATITUDE: config[DOMAIN].get(CONF_LATITUDE, hass.config.latitude),
-                CONF_LONGITUDE: config[DOMAIN].get(
-                    CONF_LATITUDE, hass.config.longitude
-                ),
-            },
-        )
-    )
-
     return True
 
 
@@ -184,7 +155,9 @@ class FluNearYouData:
         # If this is the first registration we have, start a time interval:
         if not self._async_cancel_time_interval_listener:
             self._async_cancel_time_interval_listener = async_track_time_interval(
-                self._hass, self._async_update_listener_action, DEFAULT_SCAN_INTERVAL,
+                self._hass,
+                self._async_update_listener_action,
+                DEFAULT_SCAN_INTERVAL,
             )
 
         api_category = async_get_api_category(sensor_type)

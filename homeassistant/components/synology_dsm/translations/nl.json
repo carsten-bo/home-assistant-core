@@ -4,7 +4,9 @@
             "already_configured": "Host is al geconfigureerd."
         },
         "error": {
+            "cannot_connect": "Kan geen verbinding maken",
             "connection": "Verbindingsfout: controleer uw host, poort & ssl",
+            "invalid_auth": "Ongeldige authenticatie",
             "login": "Aanmeldingsfout: controleer uw gebruikersnaam en wachtwoord",
             "missing_data": "Ontbrekende gegevens: probeer het later opnieuw of een andere configuratie",
             "otp_failed": "Tweestapsverificatie is mislukt, probeer het opnieuw met een nieuwe toegangscode",
@@ -20,25 +22,35 @@
             },
             "link": {
                 "data": {
-                    "api_version": "DSM-versie",
                     "password": "Wachtwoord",
                     "port": "Poort (optioneel)",
                     "ssl": "Gebruik SSL/TLS om verbinding te maken met uw NAS",
-                    "username": "Gebruikersnaam"
+                    "username": "Gebruikersnaam",
+                    "verify_ssl": "Controleer het SSL-certificaat"
                 },
                 "description": "Wil je {name} ({host}) instellen?",
                 "title": "Synology DSM"
             },
             "user": {
                 "data": {
-                    "api_version": "DSM-versie",
                     "host": "Host",
                     "password": "Wachtwoord",
                     "port": "Poort (optioneel)",
                     "ssl": "Gebruik SSL/TLS om verbinding te maken met uw NAS",
-                    "username": "Gebruikersnaam"
+                    "username": "Gebruikersnaam",
+                    "verify_ssl": "Controleer het SSL-certificaat"
                 },
                 "title": "Synology DSM"
+            }
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "data": {
+                    "scan_interval": "Minuten tussen scans",
+                    "timeout": "Time-out (seconden)"
+                }
             }
         }
     }

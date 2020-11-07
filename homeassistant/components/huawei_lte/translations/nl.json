@@ -11,16 +11,17 @@
             "incorrect_password": "Onjuist wachtwoord",
             "incorrect_username": "Onjuiste gebruikersnaam",
             "incorrect_username_or_password": "Onjuiste gebruikersnaam of wachtwoord",
+            "invalid_auth": "Ongeldige authenticatie",
             "invalid_url": "Ongeldige URL",
             "login_attempts_exceeded": "Maximale aanmeldingspogingen overschreden, probeer het later opnieuw.",
             "response_error": "Onbekende fout van het apparaat",
+            "unknown": "Onverwachte fout",
             "unknown_connection_error": "Onbekende fout bij verbinden met apparaat"
         },
         "step": {
             "user": {
                 "data": {
                     "password": "Wachtwoord",
-                    "url": "URL",
                     "username": "Gebruikersnaam"
                 },
                 "description": "Voer de toegangsgegevens van het apparaat in. Opgeven van gebruikersnaam en wachtwoord is optioneel, maar biedt ondersteuning voor meer integratiefuncties. Aan de andere kant kan het gebruik van een geautoriseerde verbinding problemen veroorzaken bij het openen van het webinterface van het apparaat buiten de Home Assitant, terwijl de integratie actief is en andersom.",
