@@ -6,14 +6,14 @@ import voluptuous as vol
 from homeassistant.components.water_heater import (
     SUPPORT_OPERATION_MODE,
     SUPPORT_TARGET_TEMPERATURE,
-    WaterHeaterEntity,
+    WaterHeaterDevice,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE, TEMP_CELSIUS
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv, entity_platform
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
+from . import DOMAIN, SIGNAL_TADO_UPDATE_RECEIVED
 from .const import (
     CONST_HVAC_HEAT,
     CONST_MODE_AUTO,
@@ -24,11 +24,8 @@ from .const import (
     CONST_OVERLAY_TADO_MODE,
     CONST_OVERLAY_TIMER,
     DATA,
-    DOMAIN,
-    SIGNAL_TADO_UPDATE_RECEIVED,
     TYPE_HOT_WATER,
 )
-from .entity import TadoZoneEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -60,10 +57,10 @@ WATER_HEATER_TIMER_SCHEMA = {
 }
 
 
-async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities
-):
+def setup_platform(hass, config, add_entities, discovery_info=None):
     """Set up the Tado water heater platform."""
+    if discovery_info is None:
+        return
 
     tado = hass.data[DOMAIN][entry.entry_id][DATA]
     entities = await hass.async_add_executor_job(_generate_entities, tado)
@@ -84,15 +81,17 @@ def _generate_entities(tado):
     """Create all water heater entities."""
     entities = []
 
-    for zone in tado.zones:
-        if zone["type"] == TYPE_HOT_WATER:
-            entity = create_water_heater_entity(tado, zone["name"], zone["id"], zone)
-            entities.append(entity)
+    for tado in api_list:
+        for zone in tado.zones:
+            if zone["type"] == TYPE_HOT_WATER:
+                entity = create_water_heater_entity(tado, zone["name"], zone["id"])
+                entities.append(entity)
 
-    return entities
+    if entities:
+        add_entities(entities, True)
 
 
-def create_water_heater_entity(tado, name: str, zone_id: int, zone: str):
+def create_water_heater_entity(tado, name: str, zone_id: int):
     """Create a Tado water heater device."""
     capabilities = tado.get_capabilities(zone_id)
 
@@ -107,19 +106,13 @@ def create_water_heater_entity(tado, name: str, zone_id: int, zone: str):
         max_temp = None
 
     entity = TadoWaterHeater(
-        tado,
-        name,
-        zone_id,
-        supports_temperature_control,
-        min_temp,
-        max_temp,
-        zone["devices"][0],
+        tado, name, zone_id, supports_temperature_control, min_temp, max_temp
     )
 
     return entity
 
 
-class TadoWaterHeater(TadoZoneEntity, WaterHeaterEntity):
+class TadoWaterHeater(WaterHeaterDevice):
     """Representation of a Tado water heater."""
 
     def __init__(
@@ -130,13 +123,11 @@ class TadoWaterHeater(TadoZoneEntity, WaterHeaterEntity):
         supports_temperature_control,
         min_temp,
         max_temp,
-        device_info,
     ):
         """Initialize of Tado water heater entity."""
-
         self._tado = tado
-        super().__init__(zone_name, device_info, tado.device_id, zone_id)
 
+        self.zone_name = zone_name
         self.zone_id = zone_id
         self._unique_id = f"{zone_id} {tado.device_id}"
 
@@ -155,18 +146,20 @@ class TadoWaterHeater(TadoZoneEntity, WaterHeaterEntity):
         self._current_tado_hvac_mode = CONST_MODE_SMART_SCHEDULE
         self._overlay_mode = CONST_MODE_SMART_SCHEDULE
         self._tado_zone_data = None
+        self._undo_dispatcher = None
+
+    async def async_will_remove_from_hass(self):
+        """When entity will be removed from hass."""
+        if self._undo_dispatcher:
+            self._undo_dispatcher()
 
     async def async_added_to_hass(self):
         """Register for sensor updates."""
 
-        self.async_on_remove(
-            async_dispatcher_connect(
-                self.hass,
-                SIGNAL_TADO_UPDATE_RECEIVED.format(
-                    self._tado.device_id, "zone", self.zone_id
-                ),
-                self._async_update_callback,
-            )
+        self._undo_dispatcher = async_dispatcher_connect(
+            self.hass,
+            SIGNAL_TADO_UPDATE_RECEIVED.format("zone", self.zone_id),
+            self._async_update_callback,
         )
         self._async_update_data()
 
@@ -184,6 +177,11 @@ class TadoWaterHeater(TadoZoneEntity, WaterHeaterEntity):
     def unique_id(self):
         """Return the unique id."""
         return self._unique_id
+
+    @property
+    def should_poll(self) -> bool:
+        """Do not poll."""
+        return False
 
     @property
     def current_operation(self):

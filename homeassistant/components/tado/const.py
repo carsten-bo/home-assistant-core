@@ -147,3 +147,8 @@ DEFAULT_NAME = "Tado"
 TADO_BRIDGE = "Tado Bridge"
 
 UPDATE_LISTENER = "update_listener"
+
+# Services
+
+SERVICE_SET_TIMED_OFF_MODE = "set_timed_off"
+ATTR_DURATION = "duration"

@@ -1,34 +1,27 @@
 """Support for the (unofficial) Tado API."""
-import asyncio
 from datetime import timedelta
 import logging
 
 from PyTado.interface import Tado
 from requests import RequestException
-import requests.exceptions
 import voluptuous as vol
 
 from homeassistant.components.climate.const import PRESET_AWAY, PRESET_HOME
-from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.discovery import load_platform
 from homeassistant.helpers.dispatcher import dispatcher_send
-from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import Throttle
+from homeassistant.helpers.entity_component import EntityComponent
 
-from .const import (
-    CONF_FALLBACK,
-    DATA,
-    DOMAIN,
-    SIGNAL_TADO_UPDATE_RECEIVED,
-    UPDATE_LISTENER,
-    UPDATE_TRACK,
-)
+from .const import CONF_FALLBACK, DATA
+from homeassistant.core import callback
 
 _LOGGER = logging.getLogger(__name__)
 
+DOMAIN = "tado"
+
+SIGNAL_TADO_UPDATE_RECEIVED = "tado_update_received_{}_{}"
 
 TADO_COMPONENTS = ["sensor", "climate", "water_heater"]
 
@@ -52,13 +45,9 @@ CONFIG_SCHEMA = vol.Schema(
 )
 
 
-async def async_setup(hass: HomeAssistant, config: dict):
-    """Set up the Tado component."""
-
-    hass.data.setdefault(DOMAIN, {})
-
-    if DOMAIN not in config:
-        return True
+def setup(hass, config):
+    """Set up of the Tado component."""
+    acc_list = config[DOMAIN]
 
     for conf in config[DOMAIN]:
         hass.async_create_task(
@@ -71,11 +60,17 @@ async def async_setup(hass: HomeAssistant, config: dict):
 
     return True
 
+    for acc in acc_list:
+        username = acc[CONF_USERNAME]
+        password = acc[CONF_PASSWORD]
+        fallback = acc[CONF_FALLBACK]
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
-    """Set up Tado from a config entry."""
+        tadoconnector = TadoConnector(hass, username, password, fallback)
+        if not tadoconnector.setup():
+            continue
 
-    _async_import_options_from_data_if_missing(hass, entry)
+        # Do first update
+        tadoconnector.update()
 
     username = entry.data[CONF_USERNAME]
     password = entry.data[CONF_PASSWORD]
@@ -111,51 +106,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     update_listener = entry.add_update_listener(_async_update_listener)
 
-    hass.data[DOMAIN][entry.entry_id] = {
-        DATA: tadoconnector,
-        UPDATE_TRACK: update_track,
-        UPDATE_LISTENER: update_listener,
-    }
+    hass.data[DOMAIN] = {}
+    hass.data[DOMAIN][DATA] = api_data_list
 
+    # Load components
     for component in TADO_COMPONENTS:
-        hass.async_create_task(
-            hass.config_entries.async_forward_entry_setup(entry, component)
+        load_platform(
+            hass, component, DOMAIN, {}, config,
         )
 
     return True
-
-
-@callback
-def _async_import_options_from_data_if_missing(hass: HomeAssistant, entry: ConfigEntry):
-    options = dict(entry.options)
-    if CONF_FALLBACK not in options:
-        options[CONF_FALLBACK] = entry.data.get(CONF_FALLBACK, True)
-        hass.config_entries.async_update_entry(entry, options=options)
-
-
-async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry):
-    """Handle options update."""
-    await hass.config_entries.async_reload(entry.entry_id)
-
-
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
-    """Unload a config entry."""
-    unload_ok = all(
-        await asyncio.gather(
-            *[
-                hass.config_entries.async_forward_entry_unload(entry, component)
-                for component in TADO_COMPONENTS
-            ]
-        )
-    )
-
-    hass.data[DOMAIN][entry.entry_id][UPDATE_TRACK]()
-    hass.data[DOMAIN][entry.entry_id][UPDATE_LISTENER]()
-
-    if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
-
-    return unload_ok
 
 
 class TadoConnector:
@@ -184,12 +144,19 @@ class TadoConnector:
 
     def setup(self):
         """Connect to Tado and fetch the zones."""
-        self.tado = Tado(self._username, self._password)
+        try:
+            self.tado = Tado(self._username, self._password)
+        except (RuntimeError, RequestException) as exc:
+            _LOGGER.error("Unable to connect: %s", exc)
+            return False
+
         self.tado.setDebugging(True)
+
         # Load zones and devices
         self.zones = self.tado.getZones()
         self.devices = self.tado.getMe()["homes"]
         self.device_id = self.devices[0]["id"]
+        return True
 
     @Throttle(MIN_TIME_BETWEEN_UPDATES)
     def update(self):
@@ -225,16 +192,9 @@ class TadoConnector:
 
         self.data[sensor_type][sensor] = data
 
-        _LOGGER.debug(
-            "Dispatching update to %s %s %s: %s",
-            self.device_id,
-            sensor_type,
-            sensor,
-            data,
-        )
+        _LOGGER.debug("Dispatching update to %s %s: %s", sensor_type, sensor, data)
         dispatcher_send(
-            self.hass,
-            SIGNAL_TADO_UPDATE_RECEIVED.format(self.device_id, sensor_type, sensor),
+            self.hass, SIGNAL_TADO_UPDATE_RECEIVED.format(sensor_type, sensor)
         )
 
     def get_capabilities(self, zone_id):
@@ -298,11 +258,11 @@ class TadoConnector:
 
         self.update_sensor("zone", zone_id)
 
-    def set_zone_off(self, zone_id, overlay_mode, device_type="HEATING"):
+    def set_zone_off(self, zone_id, overlay_mode, device_type="HEATING", duration=None):
         """Set a zone to off."""
         try:
             self.tado.setZoneOverlay(
-                zone_id, overlay_mode, None, None, device_type, "OFF"
+                zone_id, overlay_mode, None, duration, device_type, "OFF"
             )
         except RequestException as exc:
             _LOGGER.error("Could not set zone overlay: %s", exc)
